@@ -1,0 +1,103 @@
+\documentclass[12pt]{article}
+\usepackage{geometry} % see geometry.pdf on how to lay out the page. There's lots.
+\usepackage{amsmath}
+\usepackage{algpseudocode}
+\geometry{a4paper} % or letter or a5paper or ... etc
+% \geometry{landscape} % rotated page geometry
+
+% See the ``Article customise'' template for come common customisations
+
+\title{On FAT Size Calculation}
+\author{Bernd Böckmann}
+
+%%% BEGIN DOCUMENT
+\begin{document}
+
+\maketitle
+
+\section{Introduction}
+In the following a closed formula is derived to give a good upper bound for the sector count needed to store file allocation tables. Let this sector count be $sfat$. Further, let $ts$ be the total sector count of the drive or partition holding the filesystem, $bps$ the size of a single sector in bytes, $cls$ the number of data clusters, $spc$ the number of sectors per cluster, $res$ the number of reserved sectors, and $nfat$ the number of allocation tables. When calculating $sfat$ for a FAT16 or FAT12 filesystem, $res$ should include the sector count of the root directory.
+
+\section{Formula derivation}
+The number of clusters adheres to the following formula:
+\begin{equation}
+cls = \left\lfloor\frac{ts - res - nfat \cdot sfat}{spc}\right\rfloor
+\end{equation}
+Let for the moment ignore the fact that $sfat$ must be a whole number. As the first two clusters of every FAT system are reserved, the size of a file allocation table is calculated as the rational number
+\begin{equation}
+sfat = \frac{(cls + 2) \cdot ft}{bps}
+\end{equation}
+where $ft$ is the size of a single FAT entry in bytes. It is $ft = 1.5$ for FAT12, $ft = 2$ for FAT16, and $ft = 4$ for FAT32. Inserting $cls$ in into the last formula gives
+\begin{eqnarray}
+sfat &=& \frac{\left(\left\lfloor\frac{ts - res - nfat \cdot sfat}{spc}\right\rfloor + 2\right) \cdot ft}{bps} \nonumber\\
+ &=& \frac{\left\lfloor\frac{ft(ts - res - nfat \cdot sfat +2 \cdot spc)}{spc}\right\rfloor}{bps}\\
+ \label{e1}
+ &\le& \frac{\frac{ft(ts - res - nfat \cdot sfat +2 \cdot spc)}{spc}}{bps}
+\end{eqnarray}
+Re-arranging (\ref{e1}) gives
+\begin{equation*}
+sfat \cdot bps \cdot spc \le ft(ts - res - nfat \cdot sfat +2 \cdot spc)
+\end{equation*}
+and
+\begin{equation*}
+sfat \cdot (bps \cdot spc + ft \cdot nfat) \le ft(ts - res + 2 \cdot spc)
+\end{equation*}
+Division by $bps \cdot spc + ft \cdot nfat$ yields
+\begin{eqnarray}
+sfat &\le& \frac{ft(ts - res + 2 \cdot spc)}{bps \cdot spc + ft \cdot nfat}\nonumber\\
+\label{r-formula}
+ &\le& \left\lceil\frac{ft(ts - res + 2 \cdot spc)}{bps \cdot spc + ft \cdot nfat}\right\rceil
+\end{eqnarray}
+The last formula introduces the rounding up to the next integer number, as we can only allocate a multiple of whole sectors. When performing integer arithmetic and the modulo operation is available, we can add $+1$ to result if the remainder of the division is not zero. Otherweise, we can rewrite (\ref{r-formula}) as
+\begin{eqnarray}
+sfat &\le& \frac{ft(ts - res + 2 \cdot spc) + bps \cdot spc + ft \cdot nfat - 1}{bps \cdot spc + ft \cdot nfat} \nonumber\\
+\label{gen-formula}
+ &=& \frac{ft(ts - res + 2 \cdot spc) - 1}{bps \cdot spc + ft \cdot nfat} + 1
+\end{eqnarray}
+Formula (\ref{gen-formula}) provides an upper bound for FAT size calculation, so it is guaranteed to not return a value smaller than the real one. However, it has some problems with overflow behaviour and the fact that $ft = 1.5$ for FAT12, which is bad when doing integer arithmetic.
+ 
+\section{Simplified formula}
+Equation (\ref{gen-formula}) may be simplified (and slightly rounded up) by
+\begin{eqnarray}
+sfat &\le& \frac{ft(ts - res + 2 \cdot spc)}{bps \cdot spc + ft \cdot nfat} + 1 \nonumber
+\end{eqnarray}
+and with $2 \cdot ft$ being an integer number
+\begin{equation}
+\label{s1}
+sfat \le \frac{ts - res + 2 \cdot spc}{2 \cdot bps \cdot spc / 2 ft + nfat} + 1
+\end{equation}
+The last formula may still overflow on $ts - res + 2 \cdot spc$ if $ts$ reaches the end of the number range. If we assume $nfat = 2$, we can develop (\ref{s1}) into
+\begin{equation}
+\label{s2}
+sfat \le \frac{(ts - res + 1) / 2 + spc}{bps \cdot spc / 2 ft + 1} + 1
+\end{equation}
+This formula should be overflow safe in the case that $ts$ reaches the end of the number range. The term $bps \cdot spc / 2 ft$ might be problematic on 16-bit arithmetic. It can be re-arranged to $bps / 2 ft \cdot spc$ at the cost of a slightly more inaccurate result.
+
+
+\section{A formula for n $\cdot$ 512-byte sectors}
+Lets assume $bps = n \cdot 512$, with $n = 1$ for 512-byte sectors and $n = 4096$ for 4096-byte sectors. Let further assume that we have two file allocables $nfat = 2$. Formula (\ref{s2}) can then be used to calculate $sfat_{12}$ for FAT12, $sfat_{16}$ for FAT16 and $sfat_{32}$ for FAT32 as follows using integer arithmetic:
+\begin{eqnarray}
+sfat_{12} &\le& \frac{(ts - res + 1) / 2 + spc}{n \cdot 170\cdot spc + 1} + 1\\
+sfat_{16} &\le& \frac{(ts - res + 1) / 2 + spc}{n \cdot 128 \cdot spc + 1} + 1\\
+sfat_{32} &\le& \frac{(ts - res + 1) / 2 + spc}{n \cdot 64 \cdot spc + 1} + 1
+\end{eqnarray}
+The formula for FAT12 is slightly more inaccurate than the others, because the value $512 / 3 = 170,6667$ is rounded down to $170$ in order to round the whole formula up. We can also express as a single formula
+\begin{eqnarray}
+sfat &\le& \frac{(ts - res + 1) / 2 + spc}{n \cdot t \cdot spc + 1} + 1
+\end{eqnarray}
+With $t = 170$ for FAT12, $t = 128$ for FAT16 and $t = 64$ for FAT32, and $n = bps / 512$.
+
+\section{Getting exact numbers}
+As the above formulas give an upper bound for the number of sectors required for the FAT, what can be done to get exact numbers to not waste any sectors? Starting from an initial value for $sfat$, we can iterate a few times (usually not more than one iteration is needed), and reduce $sfat$ by one until the following condition holds:
+\begin{equation}
+(ts - res - nfat \cdot sfat) / spc > sfat \cdot bps / ft - 2
+\end{equation}
+If the left term is larger than the right term, the FAT is not large enough to store the number of clusters needed. We have to take into account the two reserved clusters. This is what the term $-2$ is for. So the algorithm is:
+\begin{algorithmic}
+\State $sfat \gets$ calculate initial value representing upper bound
+\While{$(ts - res - nfat \cdot sfat) / spc \le sfat \cdot bps / ft - 2$}
+\State $sfat \gets sfat - 1$
+\EndWhile
+\State $sfat \gets sfat + 1$
+\end{algorithmic}
+\end{document}
