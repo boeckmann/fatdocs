@@ -54,10 +54,7 @@ sfat &\le& \frac{ft(ts - res + 2 \cdot spc) + bps \cdot spc + ft \cdot nfat - 1}
 \label{gen-formula}
  &=& \frac{ft(ts - res + 2 \cdot spc) - 1}{bps \cdot spc + ft \cdot nfat} + 1
 \end{eqnarray}
-Formula (\ref{gen-formula}) provides an upper bound for FAT size calculation, so it is guaranteed to not return a value smaller than the real one. However, it has some problems with overflow behaviour and the fact that $ft = 1.5$ for FAT12, which is bad when doing integer arithmetic.
- 
-\section{Simplified formula}
-Equation (\ref{gen-formula}) may be simplified (and slightly rounded up) by
+Formula (\ref{gen-formula}) provides an upper bound for FAT size calculation, so it is guaranteed to not return a value smaller than the real one. However, it has some problems with overflow behaviour and the fact that $ft = 1.5$ for FAT12, which is bad when doing integer arithmetic. Formula (\ref{gen-formula}) may be simplified (and slightly rounded up) by
 \begin{eqnarray}
 sfat &\le& \frac{ft(ts - res + 2 \cdot spc)}{bps \cdot spc + ft \cdot nfat} + 1 \nonumber
 \end{eqnarray}
@@ -75,7 +72,7 @@ This formula should be overflow safe in the case that $ts$ reaches the end of th
 
 
 \section{A formula for n $\cdot$ 512-byte sectors}
-Lets assume $bps = n \cdot 512$, with $n = 1$ for 512-byte sectors and $n = 4096$ for 4096-byte sectors. Let further assume that we have two file allocables $nfat = 2$. Formula (\ref{s2}) can then be used to calculate $sfat_{12}$ for FAT12, $sfat_{16}$ for FAT16 and $sfat_{32}$ for FAT32 as follows using integer arithmetic:
+Lets assume $bps = n \cdot 512$, with $n = 1$ for 512-byte sectors and $n = 8$ for 4096-byte sectors. Let further assume that we have two file allocables $nfat = 2$. Formula (\ref{s2}) can then be used to calculate $sfat_{12}$ for FAT12, $sfat_{16}$ for FAT16 and $sfat_{32}$ for FAT32 as follows using integer arithmetic:
 \begin{eqnarray}
 sfat_{12} &\le& \frac{(ts - res + 1) / 2 + spc}{n \cdot 170\cdot spc + 1} + 1\\
 sfat_{16} &\le& \frac{(ts - res + 1) / 2 + spc}{n \cdot 128 \cdot spc + 1} + 1\\
@@ -85,7 +82,7 @@ The formula for FAT12 is slightly more inaccurate than the others, because the v
 \begin{eqnarray}
 sfat &\le& \frac{(ts - res + 1) / 2 + spc}{n \cdot t \cdot spc + 1} + 1
 \end{eqnarray}
-With $t = 170$ for FAT12, $t = 128$ for FAT16 and $t = 64$ for FAT32, and $n = bps / 512$.
+with $t = 170$ for FAT12, $t = 128$ for FAT16 and $t = 64$ for FAT32, and $n = bps / 512$.
 
 \section{Getting exact numbers}
 As the above formulas give an upper bound for the number of sectors required for the FAT, what can be done to get exact numbers to not waste any sectors? Starting from an initial value for $sfat$, we can iterate a few times (usually not more than one iteration is needed), and reduce $sfat$ by one until the following condition holds:
