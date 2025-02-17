@@ -1,24 +1,27 @@
-\documentclass[12pt]{article}
-\usepackage{geometry} % see geometry.pdf on how to lay out the page. There's lots.
+\documentclass[12pt]{scrartcl}
+
 \usepackage{amsmath}
+\usepackage{algorithm}
 \usepackage{algpseudocode}
-\geometry{a4paper} % or letter or a5paper or ... etc
-% \geometry{landscape} % rotated page geometry
+\usepackage{mlmodern} % The order of the packages matters; kmath changes the default text font
+\usepackage[T1]{fontenc}
+\DeclareMathSizes{12}{12}{10}{10}
 
-% See the ``Article customise'' template for come common customisations
+%\usepackage[T1]{fontenc}
+%\usepackage[usefilenames]{plex-otf}
 
-\title{On FAT Size Calculation}
+\title{On FAT Size Calculations}
 \author{Bernd Böckmann}
 
-%%% BEGIN DOCUMENT
 \begin{document}
 
 \maketitle
+\tableofcontents
 
-\section{Introduction}
-In the following a closed formula is derived to give a good upper bound for the sector count needed to store file allocation tables. Let this sector count be $sfat$. Further, let $ts$ be the total sector count of the drive or partition holding the filesystem, $bps$ the size of a single sector in bytes, $cls$ the number of data clusters, $spc$ the number of sectors per cluster, $res$ the number of reserved sectors, and $nfat$ the number of allocation tables. When calculating $sfat$ for a FAT16 or FAT12 filesystem, $res$ should include the sector count of the root directory.
+\section{FAT size determination}
+In the following a closed formula is derived to calculate the sector count needed to store individual file allocation tables as part of a FAT file system. Let this sector count be $sfat$. Further, let $ts$ be the total sector count of the drive or partition holding the file system, $bps$ the size of a single sector in bytes, $cls$ the number of data clusters, $spc$ the number of sectors per cluster, $res$ the number of reserved sectors, and $nfat$ the number of allocation tables. When calculating $sfat$ for a FAT16 or FAT12 file system, $res$ should include the sector count of the root directory.
 
-\section{Formula derivation}
+\subsection{Formula derivation}
 The number of clusters adheres to the following formula:
 \begin{equation}
 cls = \left\lfloor\frac{ts - res - nfat \cdot sfat}{spc}\right\rfloor
@@ -71,30 +74,38 @@ sfat \le \frac{(ts - res + 1) / 2 + spc}{bps \cdot spc / 2 ft + 1} + 1
 This formula should be overflow safe in the case that $ts$ reaches the end of the number range. The term $bps \cdot spc / 2 ft$ might be problematic on 16-bit arithmetic. It can be re-arranged to $bps / 2 ft \cdot spc$ at the cost of a slightly more inaccurate result.
 
 
-\section{A formula for n $\cdot$ 512-byte sectors}
-Lets assume $bps = n \cdot 512$, with $n = 1$ for 512-byte sectors and $n = 8$ for 4096-byte sectors. Let further assume that we have two file allocables $nfat = 2$. Formula (\ref{s2}) can then be used to calculate $sfat_{12}$ for FAT12, $sfat_{16}$ for FAT16 and $sfat_{32}$ for FAT32 as follows using integer arithmetic:
+\subsection{A formula for n $\cdot$ 512-byte sectors}
+Lets assume $bps = n \cdot 512$, with $n = 1$ for 512-byte sectors and $n = 8$ for 4096-byte sectors. Let further assume that we have two file allocation tables $nfat = 2$. Formula (\ref{s2}) can then be used to calculate $sfat_{12}$ for FAT12, $sfat_{16}$ for FAT16 and $sfat_{32}$ for FAT32 as follows using integer arithmetic:
 \begin{eqnarray}
 sfat_{12} &\le& \frac{(ts - res + 1) / 2 + spc}{n \cdot 170\cdot spc + 1} + 1\\
 sfat_{16} &\le& \frac{(ts - res + 1) / 2 + spc}{n \cdot 128 \cdot spc + 1} + 1\\
 sfat_{32} &\le& \frac{(ts - res + 1) / 2 + spc}{n \cdot 64 \cdot spc + 1} + 1
 \end{eqnarray}
-The formula for FAT12 is slightly more inaccurate than the others, because the value $512 / 3 = 170,6667$ is rounded down to $170$ in order to round the whole formula up. We can also express as a single formula
+The formula for FAT12 is slightly more inaccurate than the others, because the value $512 / 3 \approx 170.67$ is rounded down to $170$ in order to round the whole formula up. We can also express as a single formula
 \begin{eqnarray}
+\label{final-formula}
 sfat &\le& \frac{(ts - res + 1) / 2 + spc}{n \cdot t \cdot spc + 1} + 1
 \end{eqnarray}
 with $t = 170$ for FAT12, $t = 128$ for FAT16 and $t = 64$ for FAT32, and $n = bps / 512$.
 
-\section{Getting exact numbers}
-As the above formulas give an upper bound for the number of sectors required for the FAT, what can be done to get exact numbers to not waste any sectors? Starting from an initial value for $sfat$, we can iterate a few times (usually not more than one iteration is needed), and reduce $sfat$ by one until the following condition holds:
+\subsection{Getting an exact value}
+As the above formulas give an upper bound for the number of sectors required for the FAT, what can be done to get an exact number to not waste any sectors? Starting from a calculated value for $sfat$ from one of the formulas given above, we can iterate a few times - one iteration should be enough in most cases - and reduce $sfat$ by one until the following condition holds:
 \begin{equation}
 (ts - res - nfat \cdot sfat) / spc > sfat \cdot bps / ft - 2
 \end{equation}
 If the left term is larger than the right term, the FAT is not large enough to store the number of clusters needed. We have to take into account the two reserved clusters. This is what the term $-2$ is for. So the algorithm is:
+\begin{algorithm}
 \begin{algorithmic}
-\State $sfat \gets$ calculate initial value representing upper bound
+\caption{FAT size determination}
+\State $sfat \gets$ calculate initial value
 \While{$(ts - res - nfat \cdot sfat) / spc \le sfat \cdot bps / ft - 2$}
 \State $sfat \gets sfat - 1$
 \EndWhile
 \State $sfat \gets sfat + 1$
 \end{algorithmic}
+\end{algorithm}
+
+\section{Cluster size determination}
+To be written...
+
 \end{document}
